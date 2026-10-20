@@ -3,7 +3,7 @@
  * MainLayout 主框架（PRD 6.0 全局框架需求）
  * G-02 左侧菜单树 + 面包屑；G-03 顶部多标签页；G-04 语言切换；G-05 用户菜单与消息中心
  */
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -78,6 +78,25 @@ const parentTitle = computed(() => {
 })
 const currentTitle = computed(() => routeTitle(route))
 
+// ---- 菜单搜索：按菜单标题/路径即时过滤，命中父级时展示其全部子菜单 ----
+const menuKeyword = ref('')
+const filteredMenus = computed(() => {
+  const kw = menuKeyword.value.trim().toLowerCase()
+  if (!kw) return menus
+  return menus
+    .map((m) => {
+      const parentHit = m.title.toLowerCase().includes(kw) || tl(m.key, m.title).toLowerCase().includes(kw)
+      const children = parentHit
+        ? m.children
+        : m.children.filter((c) => c.path.toLowerCase().includes(kw) || c.title.toLowerCase().includes(kw) || tl(c.key, c.title).toLowerCase().includes(kw))
+      return { ...m, children }
+    })
+    .filter((m) => m.children.length)
+})
+function onMenuSelect() {
+  menuKeyword.value = ''
+}
+
 // ---- 多标签页（G-03）：访问页面即开 Tab，可切换/关闭；右键 Tab = 仅保留当前 ----
 watch(
   () => route.path,
@@ -104,6 +123,48 @@ function closeOthers(path) {
   tabsStore.closeOthers(path)
   if (route.path !== path) router.push(path)
 }
+
+/** 刷新当前页：变更 router-view 的 key 强制重挂载（绕过 keep-alive 缓存） */
+const reloadKey = ref(0)
+function reloadCurrent() {
+  reloadKey.value += 1
+}
+
+/** 关闭其他 / 关闭全部标签页 */
+function closeOtherTabs() {
+  tabsStore.closeOthers(route.path)
+}
+function closeAllTabs() {
+  tabsStore.closeOthers('__none__') // 不保留任何 Tab
+  router.push('/dashboard')
+}
+
+// Tab 溢出时自动滚动定位当前 Tab
+const tabsBarRef = ref(null)
+watch(
+  () => route.path,
+  () => {
+    nextTick(() => {
+      const el = tabsBarRef.value?.querySelector('.tab-item.active')
+      el?.scrollIntoView({ inline: 'nearest', block: 'nearest' })
+    })
+  }
+)
+
+// ---- 全屏切换 ----
+const isFullscreen = ref(false)
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen?.()
+    isFullscreen.value = true
+  } else {
+    document.exitFullscreen?.()
+    isFullscreen.value = false
+  }
+}
+document.addEventListener('fullscreenchange', () => {
+  isFullscreen.value = !!document.fullscreenElement
+})
 
 // keep-alive：按已打开 Tab 的组件名缓存；props.mode 复用的列表组件（一个组件多个路由）映射到组件名
 const MODE_LIST_MAP = {
@@ -165,9 +226,19 @@ onMounted(loadMessages)
         <span v-if="!collapsed">海外仓系统</span>
         <span v-else>仓</span>
       </div>
+      <!-- 菜单搜索（展开态显示） -->
+      <div v-if="!collapsed" class="menu-search">
+        <el-input v-model="menuKeyword" :placeholder="tl('layout.menuSearch', '搜索菜单')" clearable size="small">
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+      </div>
       <el-scrollbar>
-        <el-menu :default-active="route.path" :collapse="collapsed" router unique-opened class="menu" popper-class="menu-popper">
-          <el-sub-menu v-for="m in menus" :key="m.key" :index="m.key">
+        <el-menu :default-active="route.path" :collapse="collapsed" router unique-opened class="menu" popper-class="menu-popper" @select="onMenuSelect">
+          <el-menu-item index="/dashboard">
+            <el-icon><Odometer /></el-icon>
+            <template #title>{{ tl('menu.dashboard', '工作台') }}</template>
+          </el-menu-item>
+          <el-sub-menu v-for="m in filteredMenus" :key="m.key" :index="m.key">
             <template #title>{{ tl(m.key, m.title) }}</template>
             <el-menu-item v-for="c in m.children" :key="c.path" :index="c.path">{{ tl(c.key, c.title) }}</el-menu-item>
           </el-sub-menu>
@@ -189,6 +260,12 @@ onMounted(loadMessages)
           </el-breadcrumb>
         </div>
         <div class="header-right">
+          <!-- 全屏切换 -->
+          <el-icon class="header-item" :title="tl('layout.fullscreen', '全屏切换')" @click="toggleFullscreen">
+            <FullScreen v-if="!isFullscreen" />
+            <ScaleToOriginal v-else />
+          </el-icon>
+
           <!-- 语言切换（G-04） -->
           <el-dropdown @command="switchLang">
             <span class="header-item">
@@ -245,27 +322,43 @@ onMounted(loadMessages)
         </div>
       </el-header>
 
-      <!-- 多标签页工作区（G-03） -->
+      <!-- 多标签页工作区（G-03）：刷新 / 右键仅保留当前 / 关闭其他·全部 -->
       <div class="tabs-bar">
-        <div
-          v-for="t in activeTabs"
-          :key="t.path"
-          class="tab-item"
-          :class="{ active: t.path === route.path }"
-          @click="switchTab(t.path)"
-          @contextmenu.prevent="closeOthers(t.path)"
-        >
-          <span class="tab-title">{{ t.title }}</span>
-          <el-icon class="tab-close" @click.stop="closeTab(t.path)"><Close /></el-icon>
+        <div ref="tabsBarRef" class="tabs-list">
+          <div
+            v-for="t in activeTabs"
+            :key="t.path"
+            class="tab-item"
+            :class="{ active: t.path === route.path }"
+            @click="switchTab(t.path)"
+            @contextmenu.prevent="closeOthers(t.path)"
+          >
+            <span class="tab-title">{{ t.title }}</span>
+            <el-icon class="tab-close" @click.stop="closeTab(t.path)"><Close /></el-icon>
+          </div>
+        </div>
+        <div class="tabs-actions">
+          <el-tooltip :content="tl('layout.refresh', '刷新当前页')" placement="bottom">
+            <el-icon class="tab-action" @click="reloadCurrent"><Refresh /></el-icon>
+          </el-tooltip>
+          <el-dropdown trigger="click" @command="(cmd) => (cmd === 'others' ? closeOtherTabs() : closeAllTabs())">
+            <el-icon class="tab-action" :title="tl('layout.tabActions', '标签页操作')"><More /></el-icon>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="others">{{ tl('layout.closeOthers', '关闭其他') }}</el-dropdown-item>
+                <el-dropdown-item command="all">{{ tl('layout.closeAll', '关闭全部') }}</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
       </div>
 
       <!-- 主内容区：按 Tab 缓存页面状态（关闭 Tab 不影响其他页面，G-03） -->
       <el-main class="main">
         <router-view v-slot="{ Component }">
-          <!-- :key 按路由路径隔离实例：同一列表组件（props.mode 复用）在各 Tab 下独立缓存 -->
+          <!-- :key 按路由路径 + reloadKey 隔离实例：同一列表组件（props.mode 复用）在各 Tab 下独立缓存；刷新时重挂载 -->
           <keep-alive :include="cachedNames">
-            <component :is="Component" :key="route.path" />
+            <component :is="Component" :key="`${route.path}-${reloadKey}`" />
           </keep-alive>
         </router-view>
       </el-main>
@@ -277,6 +370,7 @@ onMounted(loadMessages)
 .layout { height: 100%; }
 .aside { background: #001529; transition: width 0.2s; overflow: hidden; }
 .logo { height: 50px; line-height: 50px; text-align: center; color: #fff; font-weight: 600; font-size: 15px; letter-spacing: 1px; white-space: nowrap; }
+.menu-search { padding: 8px 10px 2px; }
 .menu {
   border-right: none;
   background: #001529;
@@ -309,7 +403,13 @@ onMounted(loadMessages)
 .msg-content { font-size: 12px; color: #909399; margin-top: 2px; }
 .msg-time { font-size: 12px; color: #c0c4cc; margin-top: 2px; }
 
-.tabs-bar { background: #fff; border-bottom: 1px solid #e4e7ed; padding: 5px 12px 0; display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; }
+.tabs-bar { background: #fff; border-bottom: 1px solid #e4e7ed; padding: 5px 12px; display: flex; align-items: center; gap: 8px; }
+.tabs-list { display: flex; gap: 6px; flex: 1; min-width: 0; overflow-x: auto; }
+.tabs-list::-webkit-scrollbar { height: 4px; }
+.tabs-list::-webkit-scrollbar-thumb { background: #dcdfe6; border-radius: 2px; }
+.tabs-actions { display: flex; align-items: center; gap: 12px; flex: none; }
+.tab-action { font-size: 15px; color: #606266; cursor: pointer; }
+.tab-action:hover { color: #409eff; }
 .tab-item { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border: 1px solid #e4e7ed; border-bottom: none; border-radius: 4px 4px 0 0; cursor: pointer; font-size: 12px; color: #606266; background: #f5f7fa; white-space: nowrap; }
 .tab-item.active { background: #ecf5ff; color: #409eff; border-color: #d9ecff; }
 .tab-close { font-size: 12px; border-radius: 50%; }

@@ -632,6 +632,66 @@ export async function markAllMessagesRead() {
   return true
 }
 
+// ---------------- 工作台 ----------------
+
+const INBOUND_PENDING = ['PENDING_PICKUP', 'PENDING_CONFIRM']
+const OUTBOUND_PENDING = ['PENDING_PICKING', 'PENDING_SHIP']
+const REBRAND_PENDING = ['PENDING_PICK', 'PENDING_LABEL', 'PENDING_DISPATCH']
+const RETURN_PENDING = ['PENDING_RECEIVE', 'PENDING_SHELF', 'PENDING_PROCESS', 'PENDING_FINISH']
+
+/** 工作台汇总：待处理统计 + 最近业务单据（按登录用户隔离，PRD 首页看板） */
+export async function queryDashboard() {
+  await delay(80)
+  const un = currentUser()
+  const mine = (rows) => rows.filter((r) => !un || r.username === un)
+
+  const inbound = mine(inboundOrders)
+  const outbound = mine(outboundOrders)
+  const rebrand = mine(rebrandOrders)
+  const rets = mine(returnOrders)
+  const myBills = mine(bills)
+  const myProducts = mine(products)
+  const myInventory = mine(inventory)
+  const myMessages = messages.filter((m) => m.username === un)
+  const pendingBills = myBills.filter((b) => b.status === 'PENDING')
+
+  const stats = {
+    inboundPending: inbound.filter((r) => INBOUND_PENDING.includes(r.status)).length,
+    outboundPending: outbound.filter((r) => OUTBOUND_PENDING.includes(r.status)).length,
+    rebrandPending: rebrand.filter((r) => REBRAND_PENDING.includes(r.status)).length,
+    returnPending: rets.filter((r) => RETURN_PENDING.includes(r.status)).length,
+    billsPending: pendingBills.length,
+    billsPendingAmount: pendingBills.reduce((s, b) => s + (b.amount || 0), 0),
+    unreadMessages: myMessages.filter((m) => !m.read).length,
+    productTotal: myProducts.length,
+    productPendingAudit: myProducts.filter((p) => p.audit === 'PENDING').length,
+    skuTotal: myInventory.length,
+    onHandTotal: myInventory.reduce((s, i) => s + (i.onHand || 0), 0),
+    availableTotal: myInventory.reduce((s, i) => s + Math.max(0, (i.onHand || 0) - (i.reserved || 0)), 0)
+  }
+
+  // 最近单据：四类业务按创建时间倒序混合，取前 8 条
+  const recent = [
+    ...inbound.map((r) => ({ ...r, bizType: 'inbound' })),
+    ...outbound.map((r) => ({ ...r, bizType: 'outbound' })),
+    ...rebrand.map((r) => ({ ...r, bizType: 'rebrand' })),
+    ...rets.map((r) => ({ ...r, bizType: 'return' }))
+  ]
+    .filter((r) => r.createTime)
+    .sort((a, b) => (a.createTime < b.createTime ? 1 : -1))
+    .slice(0, 8)
+    .map((r) => ({
+      id: r.id,
+      bizType: r.bizType,
+      code: r.code,
+      status: r.status,
+      warehouse: r.warehouse || r.shipWarehouse || '',
+      createTime: r.createTime
+    }))
+
+  return { stats, recent }
+}
+
 // ---------------- 字典（下拉数据源） ----------------
 
 export function dict() {

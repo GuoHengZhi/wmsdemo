@@ -15,6 +15,7 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const formRef = ref(null)
+const logging = ref(false)
 const form = ref({ account: 'SHEN', password: '', captcha: '', remember: false })
 
 const rules = {
@@ -31,22 +32,28 @@ function refreshCaptcha() {
 }
 
 async function handleLogin() {
-  await formRef.value.validate()
-  if (form.value.captcha.toUpperCase() !== captchaCode.value) {
-    ElMessage.error(tl('login.captchaError', '验证码错误'))
-    refreshCaptcha()
-    form.value.captcha = ''
-    return
+  if (logging.value) return
+  logging.value = true
+  try {
+    await formRef.value.validate()
+    if (form.value.captcha.toUpperCase() !== captchaCode.value) {
+      ElMessage.error(tl('login.captchaError', '验证码错误'))
+      refreshCaptcha()
+      form.value.captcha = ''
+      return
+    }
+    // mock 校验：任一账号 + 密码 123456 可登录
+    if (form.value.password !== '123456') {
+      ElMessage.error(tl('login.credentialError', '账号或密码错误'))
+      refreshCaptcha()
+      return
+    }
+    userStore.login({ username: form.value.account.toUpperCase(), remember: form.value.remember })
+    ElMessage.success(`${tl('layout.welcome', '欢迎回来')}，${userStore.username}`)
+    router.push('/dashboard')
+  } finally {
+    logging.value = false
   }
-  // mock 校验：任一账号 + 密码 123456 可登录
-  if (form.value.password !== '123456') {
-    ElMessage.error(tl('login.credentialError', '账号或密码错误'))
-    refreshCaptcha()
-    return
-  }
-  userStore.login({ username: form.value.account.toUpperCase(), remember: form.value.remember })
-  ElMessage.success(`${tl('layout.welcome', '欢迎回来')}，${userStore.username}`)
-  router.push('/basic/product')
 }
 
 onMounted(refreshCaptcha)
@@ -80,7 +87,7 @@ onMounted(refreshCaptcha)
           <el-checkbox v-model="form.remember">{{ tl('login.remember', '12小时内免登录') }}</el-checkbox>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" class="login-btn" @click="handleLogin">{{ tl('login.loginBtn', '登录') }}</el-button>
+          <el-button type="primary" class="login-btn" :loading="logging" @click="handleLogin">{{ tl('login.loginBtn', '登录') }}</el-button>
         </el-form-item>
       </el-form>
       <div class="login-hint">{{ tl('login.demoHint', '演示账号：SHEN / 123456（VIP0157 / 123456 演示数据隔离）') }}</div>

@@ -2,6 +2,7 @@
 export default {
   menu: {
     login: '登录',
+    dashboard: '工作台',
     shop: '我的店铺',
     shopOrder: '店铺订单',
     shopAuthorize: '店铺授权',
@@ -117,7 +118,13 @@ export default {
     welcome: '欢迎回来',
     collapse: '收起菜单',
     noMessage: '暂无消息',
-    logoutConfirm: '确定退出登录吗？'
+    logoutConfirm: '确定退出登录吗？',
+    menuSearch: '搜索菜单',
+    refresh: '刷新当前页',
+    tabActions: '标签页操作',
+    closeOthers: '关闭其他',
+    closeAll: '关闭全部',
+    fullscreen: '全屏切换'
   },
   status: {
     inbound: {
@@ -184,5 +191,33 @@ export default {
     lang: '界面语言',
     save: '保存',
     pwdChanged: '密码修改成功（演示环境不真实校验）'
+  },
+  dashboard: {
+    welcome: '欢迎回来',
+    subtitle: '这是您当前账户的业务概览',
+    statInbound: '待处理入库',
+    statOutbound: '待处理出库',
+    statRebrand: '待处理换标',
+    statReturn: '待处理退货',
+    statBills: '待支付账单',
+    statMessages: '未读消息',
+    quickTitle: '快捷入口',
+    recentTitle: '最近业务单据',
+    colType: '业务类型',
+    colCode: '单号',
+    colWarehouse: '仓库',
+    colStatus: '状态',
+    colCreateTime: '创建时间',
+    bizInbound: '入库',
+    bizOutbound: '出库',
+    bizRebrand: '换标',
+    bizReturn: '退货',
+    viewAll: '查看全部',
+    noRecent: '暂无业务单据',
+    auditPending: '产品待审核',
+    pendingAmount: '待支付金额',
+    stockSummary: '库存概要',
+    onHand: '在库',
+    available: '可库'
   }
 }

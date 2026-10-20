@@ -14,8 +14,10 @@ const routes = [
   {
     path: '/',
     component: MainLayout,
-    redirect: '/basic/product',
+    redirect: '/dashboard',
     children: [
+      // 工作台（首页）
+      { path: 'dashboard', name: 'Dashboard', component: () => import('../views/dashboard/Dashboard.vue'), meta: { title: '工作台' } },
       // 我的店铺
       { path: 'shop/order', name: 'ShopOrder', component: () => import('../views/shop/ShopOrder.vue'), meta: { parentKey: 'menu.shop', title: '店铺订单' } },
       { path: 'shop/authorize', name: 'ShopAuthorize', component: () => import('../views/shop/ShopAuthorize.vue'), meta: { parentKey: 'menu.shop', title: '店铺授权' } },
@@ -69,7 +71,7 @@ router.beforeEach((to) => {
   const userStore = useUserStore()
   userStore.restore()
   if (to.path !== '/login' && !userStore.isLoggedIn) return '/login'
-  if (to.path === '/login' && userStore.isLoggedIn) return '/basic/product'
+  if (to.path === '/login' && userStore.isLoggedIn) return '/dashboard'
   const title = to.meta?.title || ''
   document.title = title ? `${title} - 海外仓系统` : '海外仓系统'
 })

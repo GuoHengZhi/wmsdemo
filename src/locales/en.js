@@ -2,6 +2,7 @@
 export default {
   menu: {
     login: 'Login',
+    dashboard: 'Dashboard',
     shop: 'My Shops',
     shopOrder: 'Shop Orders',
     shopAuthorize: 'Shop Authorization',
@@ -117,7 +118,13 @@ export default {
     welcome: 'Welcome',
     collapse: 'Collapse menu',
     noMessage: 'No messages',
-    logoutConfirm: 'Are you sure to logout?'
+    logoutConfirm: 'Are you sure to logout?',
+    menuSearch: 'Search menu',
+    refresh: 'Refresh page',
+    tabActions: 'Tab actions',
+    closeOthers: 'Close Others',
+    closeAll: 'Close All',
+    fullscreen: 'Fullscreen'
   },
   status: {
     inbound: {
@@ -184,5 +191,33 @@ export default {
     lang: 'Language',
     save: 'Save',
     pwdChanged: 'Password changed (demo only)'
+  },
+  dashboard: {
+    welcome: 'Welcome back',
+    subtitle: 'Business overview of your current account',
+    statInbound: 'Pending Inbound',
+    statOutbound: 'Pending Outbound',
+    statRebrand: 'Pending Rebrand',
+    statReturn: 'Pending Returns',
+    statBills: 'Bills to Pay',
+    statMessages: 'Unread Messages',
+    quickTitle: 'Quick Actions',
+    recentTitle: 'Recent Orders',
+    colType: 'Type',
+    colCode: 'Order No.',
+    colWarehouse: 'Warehouse',
+    colStatus: 'Status',
+    colCreateTime: 'Created At',
+    bizInbound: 'Inbound',
+    bizOutbound: 'Outbound',
+    bizRebrand: 'Rebrand',
+    bizReturn: 'Return',
+    viewAll: 'View All',
+    noRecent: 'No orders yet',
+    auditPending: 'Products Pending Audit',
+    pendingAmount: 'Amount to Pay',
+    stockSummary: 'Inventory',
+    onHand: 'On Hand',
+    available: 'Available'
   }
 }
